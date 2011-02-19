@@ -42,7 +42,7 @@ iterate(Step) -->  call(Step),
 		     Previous = Current -> next(Step, Next,    _)
 				        ;  next(Step,    _, Next)
 		   },
-		   iterate(NextStep).
+		   iterate(Next).
 
 %</code>
 %<h3>next/3</h3>
@@ -74,12 +74,12 @@ cost_value(iterate,     G, N, P, costs(I,R,E,G)-P,costs(I,R,E,N)-P).
 cost_value(reduce2,     G, N, P, costs(I,R,E,G)-P,costs(I,R,E,N)-P).
 
 sum_costs([], Cost, Cost).
-sum_costs([c(Input,Output)|Cs], cost(P0,In0,Out0), Cost).
+sum_costs([c(Input,Output)|Cs], cost(P0,In0,Out0), Cost) :-
    length(Input, LI),
    length(Output,LO),
    P1 is P0 + 1,
    In1 is LI + In0,
-   Out1 is LO + 0ut0,
+   Out1 is LO + Out0,
    sum_costs(Cs, cost(P1,In1,Out1), Cost).
 
 init_cost(_-PLA, costs(C,C,C,C)-PLA) :-
@@ -116,7 +116,7 @@ init_cost(_-PLA, costs(C,C,C,C)-PLA) :-
 %<h3>Cube Consensus</h3>
 %<code>
 consensus(C, D, Consensus) :-
-    distance(C, D, In, Out),
+    cube_distance(C, D, In, Out),
     consensus1(In, Out, C, D, Consensus).
 
 consensus1(0, 0, c(In,Out), c(In2, Out2), c(IIn,IOut)) :-
@@ -127,23 +127,10 @@ consensus1(1, 0, c(In,Out), c(In2,Out), c(R,Out)) :-
 consensus1(0, 1, c(In,Out), c(In,Out2), c(In,L)) :-
     lower_intersection(Out, Out2, L).
 
-distance(c(In,Out), c(In2,Out2), In, Out) :-
+cube_distance(c(In,Out), c(In2,Out2), In, Out) :-
     distance(In,   In2, 0,  In ),
     distance(Out, Out2, 0, Out ).
 
-distance([],  _, D, D) :- !.
-distance( _, [], D, D) :- !.
-distance([A|As], [B|Bs], D0, D) :-
-	   A>>1 < B>>1 -> distance(As, [B|Bs], D0, D)
-	;  A>>1 > B>>1 -> distance([A|As], Bs, D0, D)
-	; ( A =/= B -> D1 is D0 + 1 ; D1 = D0 ),
-	  distance(As, Bs, D1, D).
-
-distance([A|As], [B|Bs], D0, D) :-
-	   A>>1 < B>>1 -> distance(As, [B|Bs], D0, D)
-	;  A>>1 > B>>1 -> distance([A|As], Bs, D0, D)
-	; ( A =/= B -> D1 is D0 + 1 ; D1 = D0 ),
-	  distance(As, Bs, D1, D).
 %</code>
 
 %<h3>union/4: Include mis-matched elements</h3>
@@ -161,12 +148,18 @@ union([A|As], [B|Bs], [P|Ps], Goal) :-
 %<code>
 intersect([],  _, [], _) :- !.
 intersect( _, [], [], _) :- !.
+
 intersect([A|As], [B|Bs], Ps, Goal) :-
-      A>>1 < B>>1 -> intersect(As, [B|Bs], Ps, Goal)
-   ;  A>>1 > B>>1 -> intersect([A|As], Bs, Ps, Goal)
-   ; Ps = |R|Rs],
-     call(Goal,A,B,R),
-     intersect(As,Bs,Rs,Goal),
+      A>>1 < B>>1,
+      intersect(As, [B|Bs], Ps, Goal).
+
+intersect([A|As], [B|Bs], Ps, Goal) :-
+      A>>1 > B>>1,
+      intersect([A|As], Bs, Ps, Goal).
+
+intersect([A|As], [B|Bs], [P|Ps], Goal) :-
+     call(Goal,A,B,P),
+     intersect(As,Bs,Ps,Goal).
 %</code>
 %<h3>distance/4: Compute the distance between to cubes</h3>
 %<code>
@@ -175,7 +168,7 @@ distance( _, [], D, D) :- !.
 distance([A|As], [B|Bs], D0, D) :-
 	   A>>1 < B>>1 -> distance(As, [B|Bs], D0, D)
 	;  A>>1 > B>>1 -> distance([A|As], Bs, D0, D)
-	; ( A =/= B -> D1 is D0 + 1 ; D1 = D0 ),
+	; ( A \== B -> D1 is D0 + 1 ; D1 = D0 ),
 	  distance(As, Bs, D1, D).
 %</code>
 %
@@ -199,14 +192,27 @@ co_cover([C|Cs],P,[X|Xs]) :-
    co_cover(Cs,P,Xs).
 co_cover([_|Cs],P,Xs) :-
    co_cover(Cs,P,Xs).
-
-cofactor([],_,[]).
-cofactor([C|Cs],P,Xs) :-
-    ( C  =:=  P   -> Xs = Cs
-    ; C>>1 > P>>1 -> Xs = [C|Cs]
-    ; C>>1 < P>>1 -> Xs = [C|X1s],
-		     cofactor(Cs,P,X1s)
-    ). 
+%</code>
+%<h3>cofactor/3</h3>
+%<p>
+%<ul>
+%<li>
+%Terminate on End of List
+%</li><li>
+%Terminate on Exact Match
+%</li><li>
+%Terminate if current column number is past comparison point.
+%</li><li>
+%Not yet reached comparison column, continue with list.
+%</li><li>
+%The missing case is when the bits 'conflict', so cofactor/3 fails.
+%</li>
+%</ul>
+%<code>
+cofactor([],_,[]).         
+cofactor([C|Cs],C,Cs).
+cofactor([C|Cs],P,[C|Cs]) :-  C>>1 > P>>1.
+cofactor([C|Cs],P,[C|Xs]) :-  C>>1 < P>>1, cofactor(Cs,P,Xs).
 %</code>
 %<h3>Shannon Co-Factors of a ``Cover''</h3>
 %<p>
@@ -215,8 +221,8 @@ cofactor([C|Cs],P,Xs) :-
 %compute both positive and negative Shannon co-factors of the entire matrix.
 %<code>
 cofactors(Cover,Var,C1,C0) :-
-    V1 is Var<<1 / 1,
-    V0 is Var<<1 / 0,
+    V1 is Var<<1 /\ 1,
+    V0 is Var<<1 /\ 0,
     co_cover(Cover,V1,C1),
     co_cover(Cover,V0,C0).
 %</code>
@@ -243,7 +249,98 @@ gen_cofactor([C|Cs],[F|Fs],Xs) :-
     A = C>>1,
     B = F>>1,
     compare(A,B,Result),
-    gen_cofactor(Result,C,F,
+    gen_cofactor(Result,Cs,Fs,Xs).
+
+cofactor(=, C, _, C).
+cofactor(<, _, F, F).
+cofactor(>, C, _, C).
 %</code>
+%
+%<h3>make_parse//0</h3>
+%<code>
+make_sparse -->
+       raise_inputs(Primes),
+       lower_outputs(Primes).
+%</code>
+%
+%<h3>raise_inputs//1: raise_inputs(-Prime)</h3>
+%<h3>lower_outputs//1: lower_outputs(+Prime)</h3>
+%<code>
+raise_inputs(Primes, Cost-PLA0,Cost-PLA_Out) :-
+      raise_inputs2(PLA0, PLA0, PLA_Out, Primes, []).
+
+lower_outputs(Primes, Cost-PLA_In,Cost-PLA_Out) :-
+      lower_outputs(PLA_In, Primes,PLA_Out).
+
+raise_inputs2([], _, [], []).
+raise_inputs2([Cube|Cubes], PLA, [P|Ps], [c(RIn,Out)|Ds]) :-
+      inOut(Cube,In,Out),
+      prime(In,PLA,P),
+      raise_cube(In,RIn),
+      raise_inputs2(Cubes, PLA, Ps, Ds).
+
+raise_inputs2([c(In,Out)|Cs], PLA, Ps, [c(RIn,Out)|Ds]) :-
+      raise_cube(In,RIn),
+      raise_inputs2(Cs, PLA, Ps, Ds).
+raise_inputs2([], _, [], []).
+raise_inputs2([c(In,Out)|Cs], PLA, [P|Ps], [c(RIn,Out)|Ds]) :-
+      prime(c(In,Out),PLA,P),
+      raise_cube(In,RIn),
+      raise_inputs2(Cs, PLA, Ps, Ds).
+
+raise_inputs2([c(In,Out)|Cs], PLA, Ps, [c(RIn,Out)|Ds]) :-
+      raise_cube(In,RIn),
+      raise_inputs2(Cs, PLA, Ps, Ds).
+
+%</code>
+%
+%
+%
+%<code>
+prime(P) :- atom_chars(P,[a,x|_]), !.
+prime(P) :-
+   mysql(Connection),
+   genSQL(candidates,[1],and(chemical='?',phase>3),SQL,[]),
+   odbc_prepare(Connection, SQL, [default], Statement),
+   odbc_execute(Statement, [P], [1]).
+
+mysql(C) :-
+    existing_sql_connection(C),
+    !.
+
+mysql(C) :-
+    prompt_for_password(PW),
+    odbc_connect('myDatabase', C, [user(peter),password(PW)]),
+    !,
+    assert(existing_sql_connection(C)).
+
+mysql(_) :-
+    writeln('Could not connect to myDatabase'),
+    fail.
+
+
+%<h3>genSQL//3 : genSQL(+Table, +Selected, +Conditions)</h3>
+%<p>Generate SELECT statements from an expression tree.
+%E.g. <b>or</b>(<b>and<b>(<b>=<b>(col1,val1),<b>&lt;</b>(col3,val3)),<b>&gt;</b>(col9,val9))
+%
+%<code>
+genSQL(Table,Select,Cond) -->
+     ['Select '], genList(Select), [' from ',Table,' where '],genCond(Cond).
+
+genList([])     --> [].
+genList([S])    --> [S].
+genList([S|Ss]) --> [S],', ',genList(Ss).
+
+genCond(and(X,Y)) --> '(', genCond(X), ' AND ', genCond(Y), ')'.
+genCond(or(X,Y))  --> '(', genCond(X), ' OR ', genCond(Y), [')'].
+genCond(<(A,B))   --> [A], ' < ', [B].
+genCond(>(A,B))   --> [A], ' > ', [B].
+genCond(=(A,B))   --> [A], ' = ', [B].
+genCond('!='(A,B))--> [A], ' <> ',[B].
+genCond(not(X))  --> '( not ', genCond(X), ')'.
+genCond(notin(X,L))--> '( ', [X], ' not in (', genList(L), ')'.
+
+
+
 %</body>
 %</html>
