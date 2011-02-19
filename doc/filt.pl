@@ -1,5 +1,5 @@
 #!C:/Perl/bin/perl.exe -w
-
+# This script creates an HTML file from a Prolog program.
 my $outfile = $ARGV[0];
 
 $outfile =~ s/\.pl$/.html/;
